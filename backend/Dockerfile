@@ -1,29 +1,32 @@
-# Menggunakan versi image yang eksplisit (bukan latest)
-FROM php:8.3-fpm-alpine
+# Menggunakan versi image FrankenPHP yang eksplisit (bukan latest)
+FROM dunglas/frankenphp:1.1.5-php8.3-alpine
 
-# Install ekstensi sistem yang dibutuhkan Laravel & SQLite
+# Install ekstensi sistem yang dibutuhkan Laravel & MySQL
 RUN apk add --no-cache \
     icu-dev \
     libzip-dev \
     sqlite-dev \
-    && docker-php-ext-install pdo pdo_sqlite zip bcmath
+    mysql-client \
+    && docker-php-ext-install pdo pdo_sqlite pdo_mysql zip bcmath
 
 # Salin Composer dari image resmi
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www
+WORKDIR /app
 
-# 1. Salin composer.json dan composer.lock terlebih dahulu untuk memanfaatkan Layer Caching Docker
+# Salin file dependensi composer
 COPY composer.json composer.lock ./
 
-# 2. Install dependensi tanpa autoloader/script dulu
-RUN composer install --no-autoloader --no-scripts --no-dev --prefer-dist
+# Install dependensi composer
+RUN composer install --no-autoloader --no-scripts --prefer-dist
 
-# 3. Salin seluruh kode aplikasi
+# Salin seluruh kode aplikasi
 COPY . .
 
-# 4. Generate autoloader teroptimasi
+# Generate autoloader teroptimasi
 RUN composer dump-autoload --optimize
 
-EXPOSE 9000
-CMD ["php-fpm"]
+EXPOSE 8000
+
+# Jalankan server FrankenPHP melayani folder public/ di port 8000
+CMD ["frankenphp", "php-server", "--listen", ":8000", "--root", "public/"]
